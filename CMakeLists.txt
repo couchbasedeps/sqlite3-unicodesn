@@ -4,7 +4,7 @@ project (SQLite3_UnicodeSN)
 add_definitions(-DSQLITE_ENABLE_FTS4_UNICODE61 -DSQLITE_OMIT_LOAD_EXTENSION -DSQLITE_ENABLE_FTS4)
 set(COMPILE_FLAGS   "${COMPILE_FLAGS}   -Wall -Werror")
 
-include_directories("libstemmer_c/runtime")
+include_directories("libstemmer_c/runtime" ${SQLITE3_WIN_INCLUDE})
 
 aux_source_directory(libstemmer_c/src_c  TOKENIZER_SRC)     # All the different language stemmers
 set(TOKENIZER_SRC   ${TOKENIZER_SRC}
