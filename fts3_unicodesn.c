@@ -29,6 +29,7 @@
 #include <string.h>
 
 #include "fts3_tokenizer.h"
+#include "sqlite3_unicodesn_tokenizer.h"
 
 #include "libstemmer_c/src_c/stem_UTF_8_danish.h"
 #include "libstemmer_c/src_c/stem_UTF_8_dutch.h"
@@ -264,6 +265,16 @@ const stemmers[] = {
     {"sv", "swedish",    {swedish_UTF_8_create_env, swedish_UTF_8_close_env, swedish_UTF_8_stem}},
     {"tr", "turkish",    {turkish_UTF_8_create_env, turkish_UTF_8_close_env, turkish_UTF_8_stem}},
 };
+
+
+int unicodesn_isSupportedStemmer(const char *name) {
+    for (int i = 0; i < sizeof(stemmers)/sizeof(stemmers[0]); i++) {
+        const char *n1 = stemmers[i].shortName, *n2 = stemmers[i].longName;
+        if (strcmp(name, n1) == 0 || strcmp(name, n2) == 0)
+            return 1;
+    }
+    return 0;
+}
 
 
 static int unicodeSetStemmer(

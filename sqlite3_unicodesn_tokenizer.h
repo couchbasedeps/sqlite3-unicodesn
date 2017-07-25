@@ -9,4 +9,12 @@
  */
 int register_unicodesn_tokenizer(sqlite3 *db);
 
+/*
+ ** Returns 1 if there is a supported stemmer with the given name, which can be used as the value
+ ** of the "stemmer" parameter; otherwise returns 0.
+ ** The name is expected to be a 2-letter ISO language code, or a longer (lowercase) English
+ ** country name. For example, "en" and "english" are equivalent, and both return 1.
+ */
+int unicodesn_isSupportedStemmer(const char *name);
+
 #endif /* _UNICODESN_TOKENIZER_H_ */
