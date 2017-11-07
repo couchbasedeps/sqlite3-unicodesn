@@ -30,6 +30,7 @@
 
 #include "fts3_tokenizer.h"
 #include "sqlite3_unicodesn_tokenizer.h"
+#include "stopwordset.h"
 
 #include "libstemmer_c/src_c/stem_UTF_8_danish.h"
 #include "libstemmer_c/src_c/stem_UTF_8_dutch.h"
@@ -117,6 +118,7 @@ struct unicode_tokenizer {
     int *aiException;
     /* Snowball stemmer */
     stemmer_callbacks stemmer;
+    StopWordSet *stopwords;         /* Stop-word list, if any */
 };
 
 struct unicode_cursor {
@@ -138,6 +140,7 @@ static int unicodeDestroy(sqlite3_tokenizer *pTokenizer){
     if( pTokenizer ){
         unicode_tokenizer *p = (unicode_tokenizer *)pTokenizer;
         sqlite3_free(p->aiException);
+        freeStopwords(p->stopwords);
         sqlite3_free(p);
     }
     return SQLITE_OK;
@@ -333,6 +336,14 @@ static int unicodeCreate(
         else if( n>=8 && memcmp("stemmer=", z, 8)==0 ){
             rc = unicodeSetStemmer(pNew, &z[8], n-8);
         }
+        else if( n>=8 && memcmp("stopwords=", z, 10)==0 ){
+            if (!pNew->stopwords)
+                pNew->stopwords = newStopwordsForLanguage(&z[10], n-10);
+        }
+        else if( n>=8 && memcmp("stopwordlist=", z, 13)==0 ){
+            if (!pNew->stopwords)
+                pNew->stopwords = newStopwordsWithList(&z[13], n-13);
+        }
         else{
             /* Unrecognized argument */
             rc  = SQLITE_ERROR;
@@ -425,46 +436,51 @@ static int unicodeNext(
     int iCode = 0;
     char *zOut;
     const unsigned char *z = &pCsr->aInput[pCsr->iOff];
-    const unsigned char *zStart = z;
+    const unsigned char *zStart;
     const unsigned char *zEnd;
     const unsigned char *zTerm = &pCsr->aInput[pCsr->nInput];
 
-    /* Scan past any delimiter characters before the start of the next token.
-     ** Return SQLITE_DONE early if this takes us all the way to the end of
-     ** the input.  */
-    while( z<zTerm ){
-        READ_UTF8(z, zTerm, iCode);
-        if( unicodeIsAlnum(p, iCode) ) break;
-        zStart = z;
-    }
-    if( zStart>=zTerm ) return SQLITE_DONE;
-
-    zOut = pCsr->zToken;
     do {
-        int iOut;
+        zStart = z;
 
-        /* Grow the output buffer if required. */
-        if( (zOut-pCsr->zToken)>=(pCsr->nAlloc-4) ){
-            char *zNew = sqlite3_realloc(pCsr->zToken, pCsr->nAlloc+64);
-            if( !zNew ) return SQLITE_NOMEM;
-            zOut = &zNew[zOut - pCsr->zToken];
-            pCsr->zToken = zNew;
-            pCsr->nAlloc += 64;
+        /* Scan past any delimiter characters before the start of the next token.
+         ** Return SQLITE_DONE early if this takes us all the way to the end of
+         ** the input.  */
+        while( z<zTerm ){
+            READ_UTF8(z, zTerm, iCode);
+            if( unicodeIsAlnum(p, iCode) ) break;
+            zStart = z;
         }
+        if( zStart>=zTerm ) return SQLITE_DONE;
 
-        /* Write the folded case of the last character read to the output */
-        zEnd = z;
-        iOut = sqlite3FtsUnicodeFold(iCode, p->bRemoveDiacritic);
-        if( iOut ){
-            WRITE_UTF8(zOut, iOut);
-        }
+        zOut = pCsr->zToken;
+        do {
+            int iOut;
 
-        /* If the cursor is not at EOF, read the next character */
-        if( z>=zTerm ) break;
-        READ_UTF8(z, zTerm, iCode);
-    }while( unicodeIsAlnum(p, iCode)
-           || sqlite3FtsUnicodeIsdiacritic(iCode)
-           );
+            /* Grow the output buffer if required. */
+            if( (zOut-pCsr->zToken)>=(pCsr->nAlloc-4) ){
+                char *zNew = sqlite3_realloc(pCsr->zToken, pCsr->nAlloc+64);
+                if( !zNew ) return SQLITE_NOMEM;
+                zOut = &zNew[zOut - pCsr->zToken];
+                pCsr->zToken = zNew;
+                pCsr->nAlloc += 64;
+            }
+
+            /* Write the folded case of the last character read to the output */
+            zEnd = z;
+            iOut = sqlite3FtsUnicodeFold(iCode, p->bRemoveDiacritic);
+            if( iOut ){
+                WRITE_UTF8(zOut, iOut);
+            }
+
+            /* If the cursor is not at EOF, read the next character */
+            if( z>=zTerm ) break;
+            READ_UTF8(z, zTerm, iCode);
+        }while( unicodeIsAlnum(p, iCode)
+               || sqlite3FtsUnicodeIsdiacritic(iCode)
+               );
+    } while (isStopWord(((unicode_tokenizer*)pCsr->base.pTokenizer)->stopwords,
+                        pCsr->zToken, zOut - pCsr->zToken));
 
     if ( pCsr->pStemmer!=NULL ) {
         SN_set_current(pCsr->pStemmer, (int)(zOut - pCsr->zToken), (unsigned char *)pCsr->zToken);
