@@ -13,6 +13,7 @@ set(TOKENIZER_SRC   ${TOKENIZER_SRC}
                     sqlite3_unicodesn_tokenizer.c
                     libstemmer_c/libstemmer/libstemmer_utf8.c
                     libstemmer_c/runtime/api_sq3.c
-                    libstemmer_c/runtime/utilities_sq3.c)
+                    libstemmer_c/runtime/utilities_sq3.c
+                    stopwordset.cc)
 
 add_library(SQLite3_UnicodeSN  STATIC  ${TOKENIZER_SRC})
