@@ -129,7 +129,7 @@ int sqlite3FtsUnicodeIsalnum(int c){
     };
 
     if( c<128 ){
-        return ( (aAscii[c >> 5] & (1 << (c & 0x001F)))==0 );
+        return ( (aAscii[c >> 5] & (1u << (c & 0x001F)))==0 );
     }else if( c<(1<<22) ){
         unsigned int key = (((unsigned int)c)<<10) | 0x000003FF;
         int iRes;
