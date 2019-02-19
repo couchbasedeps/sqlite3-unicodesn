@@ -1,5 +1,7 @@
 #ifndef _UNICODESN_TOKENIZER_H_
 #define _UNICODESN_TOKENIZER_H_
+#include <stdbool.h>
+
 
 /*
  ** Registers the Unicode Snowball tokenizer as "unicodesn", for use with SQLite's FTS3 or FTS4.
@@ -16,5 +18,13 @@ int register_unicodesn_tokenizer(sqlite3 *db);
  ** country name. For example, "en" and "english" are equivalent, and both return 1.
  */
 int unicodesn_isSupportedStemmer(const char *name);
+
+/*
+ ** Informs tokenizer instances that the current thread is running a query, not indexing rows.
+ ** This affects the parsing of stop-words when the tokenizer is called on the target string of
+ ** a MATCH. For example, the stop-word "he" should be removed if the target is "he ran", but
+ ** not if it's "he* ran".
+ */
+void unicodesn_tokenizerRunningQuery(bool);
 
 #endif /* _UNICODESN_TOKENIZER_H_ */

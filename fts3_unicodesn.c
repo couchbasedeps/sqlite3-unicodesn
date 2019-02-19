@@ -419,6 +419,18 @@ static int unicodeClose(sqlite3_tokenizer_cursor *pCursor){
     return SQLITE_OK;
 }
 
+
+#ifdef _MSC_VER
+static __declspec(thread) bool sRunningQuery = false;
+#else
+static _Thread_local bool sRunningQuery = false;
+#endif
+
+void unicodesn_tokenizerRunningQuery(bool runningQuery) {
+    sRunningQuery = runningQuery;
+}
+
+
 /*
  ** Extract the next token from a tokenization cursor.  The cursor must
  ** have been opened by a prior call to simpleOpen().
@@ -474,13 +486,16 @@ static int unicodeNext(
             }
 
             /* If the cursor is not at EOF, read the next character */
-            if( z>=zTerm ) break;
+            if( z>=zTerm ) {
+                iCode = 0;
+                break;
+            }
             READ_UTF8(z, zTerm, iCode);
         }while( unicodeIsAlnum(p, iCode)
                || sqlite3FtsUnicodeIsdiacritic(iCode)
                );
-    } while (isStopWord(((unicode_tokenizer*)pCsr->base.pTokenizer)->stopwords,
-                        pCsr->zToken, zOut - pCsr->zToken));
+    } while (isStopWord(p->stopwords, pCsr->zToken, zOut - pCsr->zToken)
+             && !(iCode == '*' && sRunningQuery));   // Don't mess with e.g. `MATCH 'he*'`
 
     if ( pCsr->pStemmer!=NULL ) {
         SN_set_current(pCsr->pStemmer, (int)(zOut - pCsr->zToken), (unsigned char *)pCsr->zToken);
@@ -504,6 +519,7 @@ static int unicodeNext(
     *piPos = pCsr->iToken++;
     return SQLITE_OK;
 }
+
 
 /*
  ** Set *ppModule to a pointer to the sqlite3_tokenizer_module
