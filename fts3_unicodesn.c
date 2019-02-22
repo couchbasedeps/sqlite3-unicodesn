@@ -49,6 +49,13 @@
 #include "libstemmer_c/src_c/stem_UTF_8_swedish.h"
 #include "libstemmer_c/src_c/stem_UTF_8_turkish.h"
 
+#ifdef __APPLE__
+#include <TargetConditionals.h>
+#if TARGET_OS_SIMULATOR
+#include <pthread.h>
+#endif
+#endif
+
 
 /*
 ** The following two macros - READ_UTF8 and WRITE_UTF8 - have been copied
@@ -419,17 +426,42 @@ static int unicodeClose(sqlite3_tokenizer_cursor *pCursor){
     return SQLITE_OK;
 }
 
-
 #ifdef _MSC_VER
 static __declspec(thread) bool sRunningQuery = false;
+#define isQueryRunning() sRunningQuery
+#define setQueryRunning(x) sRunningQuery = (x)
+#elif TARGET_OS_SIMULATOR
+static pthread_key_t sQueryKey;
+
+static inline bool isQueryRunning()
+{
+    pthread_key_create(&sQueryKey, NULL);
+    void* existing = pthread_getspecific(sQueryKey);
+    if(existing == 0) {
+        pthread_setspecific(sQueryKey, (void *)1);
+        return false;
+    }
+    
+    return (int)existing == 2;
+}
+
+static inline void setQueryRunning(bool running)
+{
+    if(running) {
+        pthread_setspecific(sQueryKey, (void *)2);
+    } else {
+        pthread_setspecific(sQueryKey, (void *)1);
+    }
+}
 #else
 static _Thread_local bool sRunningQuery = false;
+#define isQueryRunning() sRunningQuery
+#define setQueryRunning(x) sRunningQuery = (x)
 #endif
 
 void unicodesn_tokenizerRunningQuery(bool runningQuery) {
-    sRunningQuery = runningQuery;
+    setQueryRunning(runningQuery);
 }
-
 
 /*
  ** Extract the next token from a tokenization cursor.  The cursor must
@@ -495,7 +527,7 @@ static int unicodeNext(
                || sqlite3FtsUnicodeIsdiacritic(iCode)
                );
     } while (isStopWord(p->stopwords, pCsr->zToken, zOut - pCsr->zToken)
-             && !(iCode == '*' && sRunningQuery));   // Don't mess with e.g. `MATCH 'he*'`
+             && !(iCode == '*' && isQueryRunning()));   // Don't mess with e.g. `MATCH 'he*'`
 
     if ( pCsr->pStemmer!=NULL ) {
         SN_set_current(pCsr->pStemmer, (int)(zOut - pCsr->zToken), (unsigned char *)pCsr->zToken);
