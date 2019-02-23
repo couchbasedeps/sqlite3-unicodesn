@@ -432,25 +432,26 @@ static __declspec(thread) bool sRunningQuery = false;
 #define setQueryRunning(x) sRunningQuery = (x)
 #elif TARGET_OS_SIMULATOR
 static pthread_key_t sQueryKey;
+static pthread_once_t sOnce = PTHREAD_ONCE_INIT;
+
+static void init_key()
+{
+    pthread_key_create(&sQueryKey, NULL);
+}
 
 static inline bool isQueryRunning()
 {
-    pthread_key_create(&sQueryKey, NULL);
-    void* existing = pthread_getspecific(sQueryKey);
-    if(existing == 0) {
-        pthread_setspecific(sQueryKey, (void *)1);
-        return false;
-    }
-    
-    return (int)existing == 2;
+    pthread_once(&sOnce, init_key);
+    return pthread_getspecific(sQueryKey);
 }
 
 static inline void setQueryRunning(bool running)
 {
+    pthread_once(&sOnce, init_key);
     if(running) {
-        pthread_setspecific(sQueryKey, (void *)2);
-    } else {
         pthread_setspecific(sQueryKey, (void *)1);
+    } else {
+        pthread_setspecific(sQueryKey, NULL);
     }
 }
 #else
