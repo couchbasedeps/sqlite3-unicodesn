@@ -61,8 +61,7 @@ namespace stopwordset {
 using namespace stopwordset;
 
 
-class StopWordSet {
-public:
+struct StopWordSet {
     // The contents of wordList must remain valid as long as this StopWordSet exists!
     StopWordSet(const char *wordList)
     :_words(200)
