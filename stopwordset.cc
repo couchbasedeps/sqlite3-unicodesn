@@ -90,7 +90,8 @@ private:
             size_t length = space ? (space-wordList) : strlen(wordList);
             if (length > 0)
                 _words.insert(slice{wordList, length});
-            wordList = space+1;
+            if (space)
+                wordList = space+1;
         } while (space);
     }
 
